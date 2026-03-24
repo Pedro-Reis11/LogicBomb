@@ -1,0 +1,19 @@
+# Sistema
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/
+
+# Node (se usar no futuro)
+node_modules/
+
+# Arquivos inúteis / temporários
+*.log
+*.tmp
+*.cache
+
+# Downloads / lixo de navegador
+*.download
+saved_resource.html
+preview

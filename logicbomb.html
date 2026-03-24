@@ -634,6 +634,7 @@
     let gameOver = false;
     let round = 1;
     let lastMode = '1';
+    let p1DiedThisRound = false;
 
     const answerInput = document.getElementById('answer');
     const timerEl    = document.getElementById('timer');
@@ -645,6 +646,8 @@
       show('game'); hide('menu'); hide('result');
       resetGame();
       generateQuestion();
+
+      answerInput.focus();
     }
     function goToMenu() {
       show('menu'); hide('game'); hide('result');
@@ -654,6 +657,8 @@
       show('game'); hide('result');
       resetGame();
       generateQuestion();
+        answerInput.focus();
+        answerInput.select();
     }
     function show(id) { document.getElementById(id).classList.remove('hidden'); }
     function hide(id) { document.getElementById(id).classList.add('hidden'); }
@@ -684,6 +689,7 @@
       qEl.classList.remove('pop');
       void qEl.offsetWidth;
       qEl.classList.add('pop');
+      answerInput.focus();
     }
 
     /* ======= ANSWER ======= */
@@ -693,7 +699,16 @@
       if (answerInput.value === '') return;
 
       if (userAnswer === currentAnswer) {
+
         scores[currentPlayer]++;
+         if (p1DiedThisRound && currentPlayer === 1) {
+                showFeedback('✅ Correto!', 'correct');
+                animateScoreBump(currentPlayer);
+                spawnFloatScore(currentPlayer);
+                updateScores();
+                endGame('winner', 1);
+        return;
+         }
         showFeedback('✅ Correto!', 'correct');
         animateScoreBump(currentPlayer);
         spawnFloatScore(currentPlayer);
@@ -705,72 +720,100 @@
         generateQuestion();
       } else {
         showFeedback('❌ Errado!', 'wrong');
+        if (p1DiedThisRound && currentPlayer === 1) {
+         lives[currentPlayer] = 0;
+        endGame('draw');
+        return;
+         }
         loseLifeAndTurn();
       }
       answerInput.value = '';
+      answerInput.focus();
     }
 
     /* ======= LIFE LOSS ======= */
     function loseLifeAndTurn() {
-      if (lives[currentPlayer] <= 0) return;
-      const prev = lives[currentPlayer];
-      lives[currentPlayer] = Math.max(0, lives[currentPlayer] - 1);
-      animateHeartLoss(currentPlayer, prev - 1);
+  if (gameOver) return;
+  if (lives[currentPlayer] <= 0) return;
 
-      if (lives[currentPlayer] === 0) { endGame(); return; }
-      nextTurn();
-      nextRound();
-      resetTimer();
-      generateQuestion();
+  const prev = lives[currentPlayer];
+  lives[currentPlayer] = Math.max(0, lives[currentPlayer] - 1);
+  animateHeartLoss(currentPlayer, prev - 1);
+
+  const is2P = lastMode === '2';
+
+  if (!is2P) {
+    if (lives[0] === 0) { endGame('solo'); return; }
+    nextTurn(); nextRound(); resetTimer(); generateQuestion();
+    return;
+  }
+
+  // P1 zerou — passa turno para P2 jogar antes de decidir
+  if (currentPlayer === 0 && lives[0] === 0) {
+    p1DiedThisRound = true;
+    nextTurn(); nextRound(); resetTimer(); generateQuestion();
+    return;
+  }
+
+  // P2 zerou
+  if (currentPlayer === 1 && lives[1] === 0) {
+    if (p1DiedThisRound) {
+      endGame('draw');    // ambos zeraram na mesma rodada
+    } else {
+      endGame('winner', 0); // só P2 zerou → P1 vence
     }
+    return;
+  }
+
+  // ninguém zerou — turno normal
+  nextTurn(); nextRound(); resetTimer(); generateQuestion();
+}
 
     /* ======= END GAME ======= */
-    function endGame() {
-      gameOver = true;
-      const loserIndex  = currentPlayer;
-      const winnerIndex = currentPlayer === 0 ? 1 : 0;
-      setTimeout(() => {
-        hide('game');
-        showResult(winnerIndex, loserIndex);
-      }, 350);
-    }
+function endGame(outcome, winnerIndex) {
+  gameOver = true;
+  setTimeout(() => {
+    hide('game');
+    showResult(outcome, winnerIndex);
+  }, 350);
+}
 
-    function showResult(winnerIndex, loserIndex) {
-      const isSingle = lastMode === '1';
-      const isDraw   = !isSingle && scores[0] === scores[1];
+function showResult(outcome, winnerIndex) {
+  const isSingle = lastMode === '1';
+  const isDraw   = outcome === 'draw';
 
-      if (isSingle) {
-        document.getElementById('result-trophy').textContent = '💥';
-        document.getElementById('result-title').textContent  = 'FIM DE JOGO!';
-      } else if (isDraw) {
-        document.getElementById('result-trophy').textContent = '🤝';
-        document.getElementById('result-title').textContent  = 'EMPATE!';
-      } else {
-        document.getElementById('result-trophy').textContent = isSingle ? '💥' : '🏆';
-        document.getElementById('result-title').textContent  = isSingle ? 'FIM DE JOGO!' : `JOGADOR ${winnerIndex + 1} VENCEU!`;
-      }
+  if (isSingle || outcome === 'solo') {
+    document.getElementById('result-trophy').textContent = '💥';
+    document.getElementById('result-title').textContent  = 'FIM DE JOGO!';
+  } else if (isDraw) {
+    document.getElementById('result-trophy').textContent = '🤝';
+    document.getElementById('result-title').textContent  = 'EMPATE!';
+  } else {
+    document.getElementById('result-trophy').textContent = '🏆';
+    document.getElementById('result-title').textContent  = `JOGADOR ${winnerIndex + 1} VENCEU!`;
+  }
 
-      const tbody  = document.getElementById('result-body');
-      tbody.innerHTML = '';
-      const players = isSingle ? [0] : [0, 1];
-      players.forEach(i => {
-        const isWinner = !isSingle && i === winnerIndex;
-        const tr = document.createElement('tr');
-        if (isWinner) tr.classList.add('winner-row');
-        const medal       = isSingle ? '🎮' : (isWinner ? '🥇' : '🥈');
-        const livesDisplay = lives[i] > 0 ? '❤️'.repeat(lives[i]) : '💀';
-        tr.innerHTML = `
-          <td class="td-player">${medal} P${i+1}</td>
-          <td class="td-score">${scores[i]}</td>
-          <td style="font-size:14px">${livesDisplay}</td>
-          <td style="font-family:'Orbitron',sans-serif;font-size:18px">${round}</td>
-        `;
-        tbody.appendChild(tr);
-      });
+  const tbody = document.getElementById('result-body');
+  tbody.innerHTML = '';
+  const players = isSingle ? [0] : [0, 1];
+  players.forEach(i => {
+    const isWinner = !isSingle && !isDraw && i === winnerIndex;
+    const tr = document.createElement('tr');
+    if (isWinner) tr.classList.add('winner-row');
+    const medal        = isSingle ? '🎮' : (isWinner ? '🥇' : '🥈');
+    const livesDisplay = lives[i] > 0 ? '❤️'.repeat(lives[i]) : '💀';
+    tr.innerHTML = `
+      <td class="td-player">${medal} P${i+1}</td>
+      <td class="td-score">${scores[i]}</td>
+      <td style="font-size:14px">${livesDisplay}</td>
+      <td style="font-family:'Orbitron',sans-serif;font-size:18px">${round}</td>
+    `;
+    tbody.appendChild(tr);
+  });
 
-      if (!isSingle) spawnConfetti();
-      show('result');
-    }
+  if (!isSingle) spawnConfetti();
+  show('result');
+}
 
     /* ======= ROUNDS / DIFFICULTY ======= */
     function nextRound() {
@@ -785,6 +828,7 @@
     function nextTurn() {
       if (lastMode === '2') {
         currentPlayer = currentPlayer === 0 ? 1 : 0;
+         if (currentPlayer === 0) p1DiedThisRound = false;
         document.getElementById('turn').textContent = 'P' + (currentPlayer + 1);
         updateActiveCard();
       }
@@ -886,7 +930,7 @@
     /* ======= RESET ======= */
     function resetGame() {
       scores = [0, 0]; lives = [3, 3];
-      currentPlayer = 0; baseTime = 10; round = 1; gameOver = false;
+      currentPlayer = 0; baseTime = 10; round = 1; gameOver = false; p1DiedThisRound = false;
       document.getElementById('round-num').textContent = '1';
       updateScores();
       renderLives(0); renderLives(1);
