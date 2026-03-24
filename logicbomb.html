@@ -664,11 +664,21 @@
     function generateQuestion() {
       if (gameOver) return;
       let max = 10 + Math.floor(scores[currentPlayer] / 3) * 5;
-      const a = Math.floor(Math.random() * max) + 1;
-      const b = Math.floor(Math.random() * max) + 1;
-      const ops = ['+', '-', '*'];
+      const ops = ['+', '-', '*', '/'];
       const op  = ops[Math.floor(Math.random() * ops.length)];
-      currentAnswer = op === '+' ? a + b : op === '-' ? a - b : a * b;
+      let a, b;
+      if (op === '/') {
+        // divisão exata: escolhe divisor e quociente, calcula dividendo
+        b = Math.floor(Math.random() * (max - 1)) + 1;
+        const result = Math.floor(Math.random() * max) + 1;
+        a = b * result;
+        currentAnswer = result;
+      } else {
+        a = Math.floor(Math.random() * max) + 1;
+        b = Math.floor(Math.random() * max) + 1;
+        currentAnswer = op === '+' ? a + b : op === '-' ? a - b : a * b;
+      }
+      const displayOp = op === '/' ? '÷' : op === '*' ? '×' : op;
       const qEl = document.getElementById('question');
       qEl.textContent = `${a} ${op} ${b}`;
       qEl.classList.remove('pop');
